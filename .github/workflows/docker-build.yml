@@ -1,34 +1,69 @@
-name: CI
+name: Build and Remote Load
 
 on:
+  workflow_dispatch:
   push:
-    branches:
-      - main
-  pull_request:
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-transfer:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ocr-app
+      IMAGE_TAG: test
+      TAR_NAME: ocr-app-test.tar
+      TAR_GZ: ocr-app-test.tar.gz
+      REMOTE_PATH: /tmp/deploy
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build
+      - name: Build image (local only)
         uses: docker/build-push-action@v5
-        env:
-          BUILDKIT_PROGRESS: plain
         with:
           context: .
           file: ./Dockerfile
           push: false
-          no-cache: true
-          tags: ocr-app:test
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
-      - name: Save image as tar
-        run: docker save ocr-app:test -o ocr-app-test.tar
+      - name: Save as tar and compress
+        run: |
+          docker save $IMAGE_NAME:$IMAGE_TAG -o $TAR_NAME
+          gzip -f $TAR_NAME
+          ls -lh $TAR_GZ
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Create checksum
+        run: sha256sum ${{ env.TAR_GZ }} | tee ${{ env.TAR_GZ }}.sha256
+
+      - name: Copy files to remote (scp)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          name: ocr-app-test
-          path: ocr-app-test.tar
+          host: ${{ secrets.TARGET_HOST }}
+          username: ${{ secrets.TARGET_USER }}
+          port: ${{ secrets.TARGET_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: |
+            ${{ env.TAR_GZ }}
+            ${{ env.TAR_GZ }}.sha256
+          target: ${{ env.REMOTE_PATH }}
+
+      - name: Load into Docker on remote (ssh)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TARGET_HOST }}
+          username: ${{ secrets.TARGET_USER }}
+          port: ${{ secrets.TARGET_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -euo pipefail
+            mkdir -p ${{ env.REMOTE_PATH }}
+            cd ${{ env.REMOTE_PATH }}
+            # ตรวจสอบไฟล์และ checksum
+            test -s ${{ env.TAR_GZ }} && test -s ${{ env.TAR_GZ }}.sha256
+            sha256sum -c ${{ env.TAR_GZ }}.sha256
+            # แตกไฟล์แล้ว load เข้า docker
+            gunzip -f ${{ env.TAR_GZ }}
+            docker load -i ${{ env.TAR_NAME }}
+            # แสดงผลยืนยัน
+            docker images | grep ${{ env.IMAGE_NAME }} || true
