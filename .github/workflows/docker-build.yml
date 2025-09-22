@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-transfer:
-    runs-on: [self-hosted, linux, ocr-net]   # ✅ ใช้ runner ภายใน
+    runs-on: [self-hosted]   # ✅ ใช้ runner ภายใน
     env:
       IMAGE_NAME: ocr-app
       IMAGE_TAG: test
