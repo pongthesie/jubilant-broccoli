@@ -41,7 +41,20 @@ jobs:
         run: sha256sum ${{ env.TAR_GZ }} | tee ${{ env.TAR_GZ }}.sha256
 
       - name: List files before upload (debug)
-        run: ls -lh ${{ env.TAR_GZ }} ${{ env.TAR_GZ }}.sha256
+        run: |
+          pwd
+          ls -lah
+          ls -lh ${{ env.TAR_GZ }} ${{ env.TAR_GZ }}.sha256
+
+      # สร้างโฟลเดอร์ปลายทางก่อน (กันกรณีไม่มี)
+      - name: Ensure remote path exists
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.TARGET_HOST }}
+          username: ${{ secrets.TARGET_USER }}
+          port: ${{ secrets.TARGET_PORT }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: mkdir -p ${{ env.REMOTE_PATH }}
 
       - name: Copy files to remote (scp)
         uses: appleboy/scp-action@v0.1.7
@@ -50,10 +63,13 @@ jobs:
           username: ${{ secrets.TARGET_USER }}
           port: ${{ secrets.TARGET_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # ✅ ใช้ path แบบ relative จาก /github/workspace
           source: |
-            ${{ github.workspace }}/${{ env.TAR_GZ }}
-            ${{ github.workspace }}/${{ env.TAR_GZ }}.sha256
+            ${{ env.TAR_GZ }}
+            ${{ env.TAR_GZ }}.sha256
           target: ${{ env.REMOTE_PATH }}
+          # (ตัวเลือก) เปิดโหมด debug เพิ่มเติม
+          # debug: true
 
       - name: Load into Docker on remote (ssh)
         uses: appleboy/ssh-action@v1.0.3
@@ -64,14 +80,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -euo pipefail
-            mkdir -p ${{ env.REMOTE_PATH }}
             cd ${{ env.REMOTE_PATH }}
             echo "Remote files:" && ls -lh
-            # ตรวจสอบไฟล์และ checksum
             test -s ${{ env.TAR_GZ }} && test -s ${{ env.TAR_GZ }}.sha256
             sha256sum -c ${{ env.TAR_GZ }}.sha256
-            # แตกไฟล์แล้ว load เข้า docker
             gunzip -f ${{ env.TAR_GZ }}
             docker load -i ${{ env.TAR_NAME }}
-            # แสดงผลยืนยัน
             docker images | grep ${{ env.IMAGE_NAME }} || true
