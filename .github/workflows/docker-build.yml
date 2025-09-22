@@ -19,13 +19,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build image (local only)
+      - name: Build image (local only, load into Docker engine)
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: false
+          load: true              # ✅ สำคัญ: ให้ buildx โหลด image เข้าท้องถิ่น
           tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+      - name: Show local images (debug)
+        run: docker images | head -n 20
 
       - name: Save as tar and compress
         run: |
@@ -35,6 +39,9 @@ jobs:
 
       - name: Create checksum
         run: sha256sum ${{ env.TAR_GZ }} | tee ${{ env.TAR_GZ }}.sha256
+
+      - name: List files before upload (debug)
+        run: ls -lh ${{ env.TAR_GZ }} ${{ env.TAR_GZ }}.sha256
 
       - name: Copy files to remote (scp)
         uses: appleboy/scp-action@v0.1.7
@@ -46,7 +53,7 @@ jobs:
           source: |
             ${{ env.TAR_GZ }}
             ${{ env.TAR_GZ }}.sha256
-          target: ${{ env.REMOTE_PATH }}
+          target: ${{ env.REMOTE_PATH }}   # ✅ ใช้ตัวแปรเดียวกัน
 
       - name: Load into Docker on remote (ssh)
         uses: appleboy/ssh-action@v1.0.3
@@ -59,6 +66,7 @@ jobs:
             set -euo pipefail
             mkdir -p ${{ env.REMOTE_PATH }}
             cd ${{ env.REMOTE_PATH }}
+            echo "Remote files:" && ls -lh
             # ตรวจสอบไฟล์และ checksum
             test -s ${{ env.TAR_GZ }} && test -s ${{ env.TAR_GZ }}.sha256
             sha256sum -c ${{ env.TAR_GZ }}.sha256
