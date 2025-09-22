@@ -1,4 +1,4 @@
-- name: Build
+  name: Build
   uses: docker/build-push-action@v5
   env:
     BUILDKIT_PROGRESS: plain
