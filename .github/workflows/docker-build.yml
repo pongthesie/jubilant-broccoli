@@ -1,10 +1,25 @@
-  name: Build
-  uses: docker/build-push-action@v5
-  env:
-    BUILDKIT_PROGRESS: plain
-  with:
-    context: .
-    file: ./Dockerfile
-    push: false
-    no-cache: true
-    tags: ocr-app:test
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: docker/build-push-action@v5
+        env:
+          BUILDKIT_PROGRESS: plain
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          no-cache: true
+          tags: ocr-app:test
