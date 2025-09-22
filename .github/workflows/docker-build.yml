@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-transfer:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, ocr-net]   # ✅ ใช้ runner ภายใน
     env:
       IMAGE_NAME: ocr-app
       IMAGE_TAG: test
@@ -46,7 +46,6 @@ jobs:
           ls -lah
           ls -lh ${{ env.TAR_GZ }} ${{ env.TAR_GZ }}.sha256
 
-      # สร้างโฟลเดอร์ปลายทางก่อน (กันกรณีไม่มี)
       - name: Ensure remote path exists
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -63,13 +62,10 @@ jobs:
           username: ${{ secrets.TARGET_USER }}
           port: ${{ secrets.TARGET_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # ✅ ใช้ path แบบ relative จาก /github/workspace
           source: |
             ${{ env.TAR_GZ }}
             ${{ env.TAR_GZ }}.sha256
           target: ${{ env.REMOTE_PATH }}
-          # (ตัวเลือก) เปิดโหมด debug เพิ่มเติม
-          # debug: true
 
       - name: Load into Docker on remote (ssh)
         uses: appleboy/ssh-action@v1.0.3
