@@ -1,7 +1,11 @@
-flask
-paddleocr
-paddlepaddle
-fastapi
-uvicorn
-tensorflow
-sqlalchemy
+flask==2.3.3
+fastapi==0.110.0
+uvicorn[standard]==0.24.0.post1
+sqlalchemy==2.0.29
+
+# PaddleOCR + PaddlePaddle จับคู่ที่เข้ากัน
+paddlepaddle==2.6.1         # CPU wheel มีสำหรับ Python 3.10
+paddleocr==2.7.0.3          # ทำงานกับ Paddle 2.6.x
+
+# ถ้าจำเป็นจริง ๆ ค่อยเปิดบรรทัดนี้ (รองรับ Py3.10)
+# tensorflow-cpu==2.16.1
